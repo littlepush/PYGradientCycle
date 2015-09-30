@@ -81,22 +81,27 @@
 - (void)_calculateCellPath
 {
     //PYLog(@"try to calculate cell path");
+    _cellPath = [UIBezierPath bezierPath];
+    [_cellPath moveToPoint:CGPointMake(_center.x, 0)];
+    [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
+    CGPoint _innerArcEndPoint = [self pointForTrapezoidWithAngle:_divRadius - M_PI_2 raidus:_dim / 2 - _cycleHeavy withCenter:_center];
+    
     if ( _lineStyle == PYGradientCycleStyleRound ) {
-        _cellPath = [UIBezierPath
-                     bezierPathWithRoundedRect:CGRectMake(_center.x - _cycleHeavy / 2,
-                                                          _cycleHeavy / 2,
-                                                          _cycleHeavy,
-                                                          _cycleHeavy)
-                     cornerRadius:_cycleHeavy / 2];
+        CGPoint _currentPoint = _cellPath.currentPoint;
+        CGPoint _rightCenter = CGPointMake((_innerArcEndPoint.x + _currentPoint.x) / 2, (_innerArcEndPoint.y + _currentPoint.y) / 2);
+        [_cellPath addArcWithCenter:_rightCenter radius:_cycleHeavy / 2 startAngle:(_divRadius - M_PI_2) endAngle:(_divRadius + M_PI_2) clockwise:YES];
     } else {
-        _cellPath = [UIBezierPath bezierPath];
-        [_cellPath moveToPoint:CGPointMake(_center.x, 0)];
-        [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
-        CGPoint _innerArcEndPoint = [self pointForTrapezoidWithAngle:_divRadius - M_PI_2 raidus:_dim / 2 - _cycleHeavy withCenter:_center];
         [_cellPath addLineToPoint:_innerArcEndPoint];
-        [_cellPath addArcWithCenter:_center radius:_dim / 2 - _cycleHeavy startAngle:_divRadius - M_PI_2 endAngle:-M_PI_2 clockwise:NO];
-        [_cellPath closePath];
     }
+    
+    [_cellPath addArcWithCenter:_center radius:_dim / 2 - _cycleHeavy startAngle:_divRadius - M_PI_2 endAngle:-M_PI_2 clockwise:NO];
+    
+    if ( _lineStyle == PYGradientCycleStyleRound ) {
+        CGPoint _leftCenter = CGPointMake(_center.x, _cycleHeavy / 2);
+        [_cellPath addArcWithCenter:_leftCenter radius:_cycleHeavy / 2 startAngle:M_PI_2 endAngle:-M_PI_2 clockwise:YES];
+    }
+    
+    [_cellPath closePath];
     
     // Reset the timer
     [_needsRecalculatePathTimer invalidate];
