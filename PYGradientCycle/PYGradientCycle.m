@@ -68,6 +68,9 @@
     CGFloat                     _percentageAfterAnimation;
     CADisplayLink               *_percentageDisplayLink;
     CGFloat                     _percentageAnimationDuration;
+    NSInteger                   _percentageDrawnPieceCount;
+    
+    CGContextRef                _cachedContext;
 }
 
 @end
@@ -78,6 +81,16 @@
     return CGPointMake(center.x + radius * cos(angle), center.y + radius * sin(angle));
 }
 
+- (void)_redrawCacheAndDisplay
+{
+    CGContextClearRect(_cachedContext, self.bounds);
+    int _pieceCount = _subDivCount * _percentage;
+    for ( int i = 0; i < _pieceCount; ++i ) {
+        [self _internalDrawPieceCellAtIndex:i inContext:_cachedContext];
+    }
+    _percentageDrawnPieceCount = _pieceCount;
+    [self setNeedsDisplay];
+}
 - (void)_calculateCellPath
 {
     //PYLog(@"try to calculate cell path");
@@ -100,14 +113,13 @@
         CGPoint _leftCenter = CGPointMake(_center.x, _cycleHeavy / 2);
         [_cellPath addArcWithCenter:_leftCenter radius:_cycleHeavy / 2 startAngle:M_PI_2 endAngle:-M_PI_2 clockwise:YES];
     }
-    
     [_cellPath closePath];
     
     // Reset the timer
     [_needsRecalculatePathTimer invalidate];
     _needsRecalculatePathTimer = nil;
     
-    [self setNeedsDisplay];
+    [self _redrawCacheAndDisplay];
 }
 
 - (void)_initializeDefaultParameters
@@ -122,6 +134,7 @@
     
     _cellPath = nil;
     _needsRecalculatePathTimer = nil;
+    _cachedContext = NULL;
     [self setNeedsRecalculateCellPath];
 }
 
@@ -144,6 +157,26 @@
     [super setFrame:frame];
     _center = CGPointMake(frame.size.width / 2, frame.size.height / 2);
     _dim = MIN(frame.size.width, frame.size.height);
+    
+    if ( _cachedContext ) {
+        CGContextRelease(_cachedContext);
+    }
+    
+    CGFloat _w = frame.size.width;
+    CGFloat _h = frame.size.height;
+    CGFloat _s = [UIScreen mainScreen].scale;
+    
+    CGColorSpaceRef _colorSpace = CGColorSpaceCreateDeviceRGB();
+    _cachedContext = CGBitmapContextCreate(NULL,
+                                           _w * _s,
+                                           _h * _s,
+                                           8,
+                                           _w * _s * 4,
+                                           _colorSpace,
+                                           kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(_colorSpace);
+    CGContextScaleCTM(_cachedContext, _s, _s);
+    
     [self setNeedsRecalculateCellPath];
 }
 
@@ -152,18 +185,39 @@
     [super setBounds:bounds];
     _center = CGPointMake(bounds.size.width / 2, bounds.size.height / 2);
     _dim = MIN(bounds.size.width, bounds.size.height);
+    
+    if ( _cachedContext ) {
+        CGContextRelease(_cachedContext);
+    }
+    
+    CGFloat _w = bounds.size.width;
+    CGFloat _h = bounds.size.height;
+    CGFloat _s = [UIScreen mainScreen].scale;
+    
+    CGColorSpaceRef _colorSpace = CGColorSpaceCreateDeviceRGB();
+    _cachedContext = CGBitmapContextCreate(NULL,
+                                           _w * _s,
+                                           _h * _s,
+                                           8,
+                                           _w * _s * 4,
+                                           _colorSpace,
+                                           kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(_colorSpace);
+    CGContextScaleCTM(_cachedContext, _s, _s);
+    
     [self setNeedsRecalculateCellPath];
 }
 
 @synthesize percentange = _percentage;
 - (void)setPercentange:(CGFloat)percentange
 {
-    [self willChangeValueForKey:@"percentage"];
-    
     if ( percentange > 1.f ) percentange = 1.f;
+    if ( PYFLOATEQUAL(percentange, _percentage) ) return;
+    
+    [self willChangeValueForKey:@"percentage"];
     // Set the percentage
     _percentage = percentange;
-    [self setNeedsDisplay];
+    [self _redrawCacheAndDisplay];
     
     [self didChangeValueForKey:@"percentage"];
 }
@@ -178,6 +232,7 @@
     
     [self didChangeValueForKey:@"lineStyle"];
 }
+
 @synthesize cycleHeavy = _cycleHeavy;
 - (void)setCycleHeavy:(CGFloat)cycleHeavy
 {
@@ -193,7 +248,7 @@
     [self willChangeValueForKey:@"isGradientFill"];
     _gradientFill = isGradientFill;
     [self didChangeValueForKey:@"isGradientFill"];
-    [self setNeedsDisplay];
+    [self _redrawCacheAndDisplay];
 }
 
 @synthesize gradientCycleQuality = _subDivCount;
@@ -204,7 +259,6 @@
     _divRadius = M_PI * 2 / _subDivCount;
     [self didChangeValueForKey:@"gradientCycleQuality"];
     [self setNeedsRecalculateCellPath];
-    if ( _gradientFill ) [self setNeedsDisplay];
 }
 
 @synthesize fillColor = _fillColor;
@@ -213,7 +267,7 @@
     [self willChangeValueForKey:@"fillColor"];
     _fillColor = fillColor;
     [self didChangeValueForKey:@"fillColor"];
-    if ( _gradientFill == NO ) [self setNeedsDisplay];
+    if ( _gradientFill == NO ) [self _redrawCacheAndDisplay];
 }
 
 - (id)init
@@ -226,14 +280,25 @@
     return self;
 }
 
+- (void)dealloc
+{
+    if ( _cachedContext ) {
+        CGContextRelease(_cachedContext);
+    }
+}
+
 - (void)setPercentange:(CGFloat)percentange animateDuration:(CGFloat)duration
 {
     if ( percentange > 1.f ) percentange = 1.f;
     _percentageBeforeAnimation = _percentage;
     _percentageAfterAnimation = percentange;
     _percentageAnimationDuration = duration;
+    _percentageDrawnPieceCount = _subDivCount * _percentage;
     
-    if ( _percentageDisplayLink ) return;
+    if ( _percentageDisplayLink ) {
+        [_percentageDisplayLink invalidate];
+    }
+    
     _percentageDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(_percentageAnimationEvent)];
     [_percentageDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
@@ -248,8 +313,19 @@
     CGFloat _deltaPercentage = (_percentageAfterAnimation - _percentageBeforeAnimation);
     CGFloat _deltaEachTime = _percentageAnimationDuration / _percentageDisplayLink.duration;
     CGFloat _deltaPercentageEachTime = _deltaPercentage / _deltaEachTime;
+    
     _percentage += _deltaPercentageEachTime;
-    [self setNeedsDisplay];
+    
+    int _pieceCount = _subDivCount * self.percentange;
+    if ( _percentageDrawnPieceCount > _pieceCount ) {
+        [self _redrawCacheAndDisplay];
+    } else {
+        for ( NSInteger i = _percentageDrawnPieceCount; i < _pieceCount; ++i ) {
+            [self _internalDrawPieceCellAtIndex:(int)i inContext:_cachedContext];
+        }
+        _percentageDrawnPieceCount = _pieceCount;
+        [self setNeedsDisplay];
+    }
 }
 
 - (void)_internalDrawPieceCellAtIndex:(NSInteger)index inContext:(CGContextRef)ctx
@@ -259,6 +335,7 @@
     CGContextRotateCTM(ctx, index * _divRadius);
     CGContextTranslateCTM(ctx, -self.bounds.size.width / 2, -self.bounds.size.height / 2);
     
+    CGContextSetLineCap(ctx, kCGLineCapRound);
     if ( _gradientFill ) {
         UIColor *_gColor = [UIColor colorWithHue:(float)index / _subDivCount saturation:1 brightness:1 alpha:1];
         CGContextSetFillColorWithColor(ctx, _gColor.CGColor);
@@ -276,10 +353,9 @@
 
 - (void)drawInContext:(CGContextRef)ctx
 {
-    int _pieceCount = _subDivCount * self.percentange;
-    for ( NSInteger i = 0; i < _pieceCount; ++i ) {
-        [self _internalDrawPieceCellAtIndex:(int)i inContext:ctx];
-    }
+    CGImageRef _cachedImage = CGBitmapContextCreateImage(_cachedContext);
+    CGContextDrawImage(ctx, self.bounds, _cachedImage);
+    CGImageRelease(_cachedImage);
 }
 
 @end
