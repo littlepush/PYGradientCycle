@@ -49,24 +49,25 @@
 
 @interface PYGradientCycle ()
 {
-    CGFloat         _percentage;
+    CGFloat                     _percentage;
     
-    CGFloat         _cycleHeavy;
-    NSInteger       _subDivCount;
-    CGFloat         _divRadius;
-    CGPoint         _center;
-    CGFloat         _dim;
+    PYGradientCycleStyle        _lineStyle;
+    CGFloat                     _cycleHeavy;
+    NSInteger                   _subDivCount;
+    CGFloat                     _divRadius;
+    CGPoint                     _center;
+    CGFloat                     _dim;
     
-    BOOL            _gradientFill;
-    UIColor         *_fillColor;
+    BOOL                        _gradientFill;
+    UIColor                     *_fillColor;
     
-    UIBezierPath    *_cellPath;
-    NSTimer         *_needsRecalculatePathTimer;
+    UIBezierPath                *_cellPath;
+    NSTimer                     *_needsRecalculatePathTimer;
     
-    CGFloat         _percentageBeforeAnimation;
-    CGFloat         _percentageAfterAnimation;
-    CADisplayLink   *_percentageDisplayLink;
-    CGFloat         _percentageAnimationDuration;
+    CGFloat                     _percentageBeforeAnimation;
+    CGFloat                     _percentageAfterAnimation;
+    CADisplayLink               *_percentageDisplayLink;
+    CGFloat                     _percentageAnimationDuration;
 }
 
 @end
@@ -80,13 +81,22 @@
 - (void)_calculateCellPath
 {
     //PYLog(@"try to calculate cell path");
-    _cellPath = [UIBezierPath bezierPath];
-    [_cellPath moveToPoint:CGPointMake(_center.x, 0)];
-    [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
-    CGPoint _innerArcEndPoint = [self pointForTrapezoidWithAngle:_divRadius - M_PI_2 raidus:_dim / 2 - _cycleHeavy withCenter:_center];
-    [_cellPath addLineToPoint:_innerArcEndPoint];
-    [_cellPath addArcWithCenter:_center radius:_dim / 2 - _cycleHeavy startAngle:_divRadius - M_PI_2 endAngle:-M_PI_2 clockwise:NO];
-    [_cellPath closePath];
+    if ( _lineStyle == PYGradientCycleStyleRound ) {
+        _cellPath = [UIBezierPath
+                     bezierPathWithRoundedRect:CGRectMake(_center.x - _cycleHeavy / 2,
+                                                          _cycleHeavy / 2,
+                                                          _cycleHeavy,
+                                                          _cycleHeavy)
+                     cornerRadius:_cycleHeavy / 2];
+    } else {
+        _cellPath = [UIBezierPath bezierPath];
+        [_cellPath moveToPoint:CGPointMake(_center.x, 0)];
+        [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
+        CGPoint _innerArcEndPoint = [self pointForTrapezoidWithAngle:_divRadius - M_PI_2 raidus:_dim / 2 - _cycleHeavy withCenter:_center];
+        [_cellPath addLineToPoint:_innerArcEndPoint];
+        [_cellPath addArcWithCenter:_center radius:_dim / 2 - _cycleHeavy startAngle:_divRadius - M_PI_2 endAngle:-M_PI_2 clockwise:NO];
+        [_cellPath closePath];
+    }
     
     // Reset the timer
     [_needsRecalculatePathTimer invalidate];
@@ -103,6 +113,7 @@
     _divRadius = M_PI * 2 / _subDivCount;
     _gradientFill = YES;
     _fillColor = [UIColor redColor];
+    _lineStyle = PYGradientCycleStyleRound;
     
     _cellPath = nil;
     _needsRecalculatePathTimer = nil;
@@ -152,6 +163,16 @@
     [self didChangeValueForKey:@"percentage"];
 }
 
+@synthesize lineStyle = _lineStyle;
+- (void)setLineStyle:(PYGradientCycleStyle)lineStyle
+{
+    [self willChangeValueForKey:@"lineStyle"];
+    
+    _lineStyle = lineStyle;
+    [self setNeedsRecalculateCellPath];
+    
+    [self didChangeValueForKey:@"lineStyle"];
+}
 @synthesize cycleHeavy = _cycleHeavy;
 - (void)setCycleHeavy:(CGFloat)cycleHeavy
 {
@@ -194,6 +215,7 @@
 {
     self = [super init];
     if ( self ) {
+        self.contentsScale = [UIScreen mainScreen].scale;
         [self _initializeDefaultParameters];
     }
     return self;

@@ -50,32 +50,42 @@ typedef NS_ENUM(NSInteger, PYGradientCycleQuality) {
     PYGradientCycleQualityUltra = 1024
 };
 
+typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
+    PYGradientCycleStyleHard,
+    PYGradientCycleStyleRound,
+};
+
 @interface PYGradientCycle : CALayer
 
 /*!
  @brief The percentage of the cycle. 0 - 1, in float
  */
-@property (nonatomic, assign)   CGFloat         percentange;
+@property (nonatomic, assign)   CGFloat                 percentange;
+
+/*!
+ @brief The syle of the line, default is PYGradientCycleStyleRound
+ */
+@property (nonatomic, assign)   PYGradientCycleStyle    lineStyle;
 
 /*!
  @brief The heavy of the cycle, default is 10px
  */
-@property (nonatomic, assign)   CGFloat         cycleHeavy;
+@property (nonatomic, assign)   CGFloat                 cycleHeavy;
 
 /*!
  @brief if use a gradient color to fill the cycle. Default is YES
  */
-@property (nonatomic, assign)   BOOL            isGradientFill;
+@property (nonatomic, assign)   BOOL                    isGradientFill;
 
 /*!
  @brief the quality of the gradient, default is PYGradientCycleQualityNormal
  */
-@property (nonatomic, assign)   NSInteger       gradientCycleQuality;
+@property (nonatomic, assign)   NSInteger               gradientCycleQuality;
 
 /*!
  @brief the color to fill the cycle when not gradient fill. Default is RED
  */
-@property (nonatomic, strong)   UIColor         *fillColor;
+@property (nonatomic, strong)   UIColor                 *fillColor;
 
 /*!
  @brief update the percentage of the cycle in specified duration.
