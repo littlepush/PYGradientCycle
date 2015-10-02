@@ -90,7 +90,7 @@ typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
 /*!
  @brief update the percentage of the cycle in specified duration.
  */
-- (void)setPercentange:(CGFloat)percentange animateDuration:(CGFloat)duration;
+- (void)setPercentage:(CGFloat)percentange animateDuration:(CGFloat)duration;
 
 @end
 

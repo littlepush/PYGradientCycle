@@ -335,7 +335,7 @@
     return [super actionForKey:event];
 }
 
-- (void)setPercentange:(CGFloat)percentange animateDuration:(CGFloat)duration
+- (void)setPercentage:(CGFloat)percentange animateDuration:(CGFloat)duration
 {
     if ( percentange > 1.f ) percentange = 1.f;
     
