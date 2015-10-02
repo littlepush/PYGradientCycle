@@ -66,7 +66,6 @@
     
     //CGContextRef                _cachedContext;
     UIImage                     *_cachedImage;
-    UIImage                     *_maskedImage;
 }
 
 @end
@@ -128,28 +127,6 @@
 }
 
 /*!
- @brief create the mask image according to the circle line path.
- */
-- (void)_percentageCircleMaskImage {
-    UIGraphicsBeginImageContextWithOptions(self.bounds.size, NO, [UIScreen mainScreen].scale);
-    
-    CGContextRef _imgCtx = UIGraphicsGetCurrentContext();
-    
-    CGContextTranslateCTM(_imgCtx, 0.0, self.bounds.size.height);
-    CGContextScaleCTM(_imgCtx, 1.0, -1.0);
-    
-    UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
-    [_circlePath addClip];
-    [_cachedImage drawAtPoint:CGPointZero];
-    
-    CGContextScaleCTM(_imgCtx, 1.0, -1.0);
-    CGContextTranslateCTM(_imgCtx, 0.0, -self.bounds.size.height);
-    
-    _maskedImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-}
-
-/*!
  @brief Redraw the cache image according to the gradientCycleQuality, or frame changed
  */
 - (void)_redrawCacheAndDisplay
@@ -202,7 +179,6 @@
     _cellPath = nil;
     _needsRecalculatePathTimer = nil;
     _cachedImage = nil;
-    _maskedImage = nil;
     [self setNeedsRecalculateCellPath];
     
     self.percentage = 0.f;
@@ -398,12 +374,16 @@
 
 - (void)drawInContext:(CGContextRef)ctx
 {
+    UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
+    
     if ( _gradientFill ) {
-        [self _percentageCircleMaskImage];
-        CGContextDrawImage(ctx, self.bounds, _maskedImage.CGImage);
+        //[self _percentageCircleMaskImage];
+        CGContextAddPath(ctx, _circlePath.CGPath);
+        CGContextClip(ctx);
+        CGContextDrawImage(ctx, self.bounds, _cachedImage.CGImage);
+        //CGContextDrawImage(ctx, self.bounds, _maskedImage.CGImage);
     } else {
         CGContextSetFillColorWithColor(ctx, _fillColor.CGColor);
-        UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
         CGContextAddPath(ctx, _circlePath.CGPath);
         CGContextFillPath(ctx);
     }
