@@ -398,8 +398,15 @@
 
 - (void)drawInContext:(CGContextRef)ctx
 {
-    [self _percentageCircleMaskImage];
-    CGContextDrawImage(ctx, self.bounds, _maskedImage.CGImage);
+    if ( _gradientFill ) {
+        [self _percentageCircleMaskImage];
+        CGContextDrawImage(ctx, self.bounds, _maskedImage.CGImage);
+    } else {
+        CGContextSetFillColorWithColor(ctx, _fillColor.CGColor);
+        UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
+        CGContextAddPath(ctx, _circlePath.CGPath);
+        CGContextFillPath(ctx);
+    }
 }
 
 @end
