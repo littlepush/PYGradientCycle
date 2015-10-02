@@ -335,17 +335,17 @@
     return [super actionForKey:event];
 }
 
-- (void)setPercentage:(CGFloat)percentange animateDuration:(CGFloat)duration
+- (void)setPercentage:(CGFloat)percentage animateDuration:(CGFloat)duration
 {
-    if ( percentange > 1.f ) percentange = 1.f;
+    if ( percentage > 1.f ) percentage = 1.f;
     
     CABasicAnimation *_percentageAnim = [CABasicAnimation animationWithKeyPath:@"percentage"];
     _percentageAnim.fromValue = @(self.percentage);
-    _percentageAnim.toValue = @(percentange);
+    _percentageAnim.toValue = @(percentage);
     _percentageAnim.duration = duration;
     _percentageAnim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
     
-    [self setPercentage:percentange];
+    [self setPercentage:percentage];
     [self addAnimation:_percentageAnim forKey:@"percentage"];
 }
 
