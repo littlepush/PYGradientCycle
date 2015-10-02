@@ -49,7 +49,7 @@
 
 @interface PYGradientCycle ()
 {
-    CGFloat                     _percentage;
+    //CGFloat                     _percentage;
     
     PYGradientCycleStyle        _lineStyle;
     CGFloat                     _cycleHeavy;
@@ -64,55 +64,119 @@
     UIBezierPath                *_cellPath;
     NSTimer                     *_needsRecalculatePathTimer;
     
-    CGFloat                     _percentageBeforeAnimation;
-    CGFloat                     _percentageAfterAnimation;
-    CADisplayLink               *_percentageDisplayLink;
-    CGFloat                     _percentageAnimationDuration;
-    NSInteger                   _percentageDrawnPieceCount;
-    
-    CGContextRef                _cachedContext;
+    //CGContextRef                _cachedContext;
+    UIImage                     *_cachedImage;
+    UIImage                     *_maskedImage;
 }
 
 @end
 
 @implementation PYGradientCycle
 
-- (CGPoint)pointForTrapezoidWithAngle:(CGFloat)angle raidus:(CGFloat)radius withCenter:(CGPoint)center {
+/*!
+ @brief Math method to calculate a point on the circle.
+ */
+- (CGPoint)_pointForTrapezoidWithAngle:(CGFloat)angle raidus:(CGFloat)radius withCenter:(CGPoint)center {
     return CGPointMake(center.x + radius * cos(angle), center.y + radius * sin(angle));
 }
 
+/*!
+ @brief calculate the path according to current percentage
+ */
+- (UIBezierPath *)_cyclePathForPercentage:(CGFloat)percentage
+{
+    CGFloat _endAngle = (M_PI * 2 * percentage);
+    UIBezierPath *_cyclePath = [UIBezierPath bezierPath];
+    [_cyclePath moveToPoint:CGPointMake(_center.x, _center.y - _dim)];
+    [_cyclePath addArcWithCenter:_center
+                          radius:(_dim / 2)
+                      startAngle:(-M_PI_2)
+                        endAngle:(_endAngle - M_PI_2)
+                       clockwise:YES];
+    CGPoint _innerCycleEndPoint = [self _pointForTrapezoidWithAngle:(_endAngle - M_PI_2)
+                                                             raidus:(_dim / 2 - _cycleHeavy)
+                                                         withCenter:_center];
+    
+    if ( _lineStyle == PYGradientCycleStyleRound ) {
+        CGPoint _currentPoint = _cyclePath.currentPoint;
+        CGPoint _rightCenter = CGPointMake((_innerCycleEndPoint.x + _currentPoint.x) / 2,
+                                           (_innerCycleEndPoint.y + _currentPoint.y) / 2);
+        [_cyclePath addArcWithCenter:_rightCenter
+                              radius:(_cycleHeavy / 2)
+                          startAngle:(_endAngle - M_PI_2)
+                            endAngle:(_endAngle + M_PI_2)
+                           clockwise:YES];
+    }
+    
+    [_cyclePath addArcWithCenter:_center
+                          radius:(_dim / 2 - _cycleHeavy)
+                      startAngle:(_endAngle - M_PI_2)
+                        endAngle:(-M_PI_2)
+                       clockwise:NO];
+    
+    if ( _lineStyle == PYGradientCycleStyleRound ) {
+        CGPoint _leftCenter = CGPointMake(_center.x, (_center.y - _dim) + (_cycleHeavy / 2));
+        [_cyclePath addArcWithCenter:_leftCenter
+                              radius:(_cycleHeavy / 2)
+                          startAngle:(M_PI_2)
+                            endAngle:(-M_PI_2)
+                           clockwise:YES];
+    }
+    
+    [_cyclePath closePath];
+    return _cyclePath;
+}
+
+/*!
+ @brief create the mask image according to the circle line path.
+ */
+- (void)_percentageCircleMaskImage {
+    UIGraphicsBeginImageContextWithOptions(self.bounds.size, NO, [UIScreen mainScreen].scale);
+    
+    CGContextRef _imgCtx = UIGraphicsGetCurrentContext();
+    
+    CGContextTranslateCTM(_imgCtx, 0.0, self.bounds.size.height);
+    CGContextScaleCTM(_imgCtx, 1.0, -1.0);
+    
+    UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
+    [_circlePath addClip];
+    [_cachedImage drawAtPoint:CGPointZero];
+    
+    CGContextScaleCTM(_imgCtx, 1.0, -1.0);
+    CGContextTranslateCTM(_imgCtx, 0.0, -self.bounds.size.height);
+    
+    _maskedImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+}
+
+/*!
+ @brief Redraw the cache image according to the gradientCycleQuality, or frame changed
+ */
 - (void)_redrawCacheAndDisplay
 {
-    CGContextClearRect(_cachedContext, self.bounds);
-    int _pieceCount = _subDivCount * _percentage;
-    for ( int i = 0; i < _pieceCount; ++i ) {
-        [self _internalDrawPieceCellAtIndex:i inContext:_cachedContext];
+    UIGraphicsBeginImageContextWithOptions(self.bounds.size, YES, 0.0);
+    CGContextRef _imageCtx = UIGraphicsGetCurrentContext();
+    
+    for ( int i = 0; i < _subDivCount; ++i ) {
+        [self _internalDrawPieceCellAtIndex:i inContext:_imageCtx];
     }
-    _percentageDrawnPieceCount = _pieceCount;
+    
+    _cachedImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
     [self setNeedsDisplay];
 }
+
+/*!
+ @brief Re-caclulate the div cell path, then re-draw the cache
+ */
 - (void)_calculateCellPath
 {
     //PYLog(@"try to calculate cell path");
     _cellPath = [UIBezierPath bezierPath];
-    [_cellPath moveToPoint:CGPointMake(_center.x, 0)];
+    [_cellPath moveToPoint:CGPointMake(_center.x, _center.y - _dim)];
     [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
-    CGPoint _innerArcEndPoint = [self pointForTrapezoidWithAngle:_divRadius - M_PI_2 raidus:_dim / 2 - _cycleHeavy withCenter:_center];
-    
-    if ( _lineStyle == PYGradientCycleStyleRound ) {
-        CGPoint _currentPoint = _cellPath.currentPoint;
-        CGPoint _rightCenter = CGPointMake((_innerArcEndPoint.x + _currentPoint.x) / 2, (_innerArcEndPoint.y + _currentPoint.y) / 2);
-        [_cellPath addArcWithCenter:_rightCenter radius:_cycleHeavy / 2 startAngle:(_divRadius - M_PI_2) endAngle:(_divRadius + M_PI_2) clockwise:YES];
-    } else {
-        [_cellPath addLineToPoint:_innerArcEndPoint];
-    }
-    
-    [_cellPath addArcWithCenter:_center radius:_dim / 2 - _cycleHeavy startAngle:_divRadius - M_PI_2 endAngle:-M_PI_2 clockwise:NO];
-    
-    if ( _lineStyle == PYGradientCycleStyleRound ) {
-        CGPoint _leftCenter = CGPointMake(_center.x, _cycleHeavy / 2);
-        [_cellPath addArcWithCenter:_leftCenter radius:_cycleHeavy / 2 startAngle:M_PI_2 endAngle:-M_PI_2 clockwise:YES];
-    }
+    [_cellPath addLineToPoint:_center];
     [_cellPath closePath];
     
     // Reset the timer
@@ -122,9 +186,12 @@
     [self _redrawCacheAndDisplay];
 }
 
+/*!
+ @brief Initialize
+ */
 - (void)_initializeDefaultParameters
 {
-    _percentage = 0.f;
+    //_percentage = 0.f;
     _cycleHeavy = 10.f;
     _subDivCount = PYGradientCycleQualityNormal;
     _divRadius = M_PI * 2 / _subDivCount;
@@ -134,10 +201,16 @@
     
     _cellPath = nil;
     _needsRecalculatePathTimer = nil;
-    _cachedContext = NULL;
+    _cachedImage = nil;
+    _maskedImage = nil;
     [self setNeedsRecalculateCellPath];
+    
+    self.percentage = 0.f;
 }
 
+/*!
+ @brief Re-calculate the path in the next runloop fire date.
+ */
 - (void)setNeedsRecalculateCellPath
 {
     if ( _needsRecalculatePathTimer != nil ) return;
@@ -157,26 +230,6 @@
     [super setFrame:frame];
     _center = CGPointMake(frame.size.width / 2, frame.size.height / 2);
     _dim = MIN(frame.size.width, frame.size.height);
-    
-    if ( _cachedContext ) {
-        CGContextRelease(_cachedContext);
-    }
-    
-    CGFloat _w = frame.size.width;
-    CGFloat _h = frame.size.height;
-    CGFloat _s = [UIScreen mainScreen].scale;
-    
-    CGColorSpaceRef _colorSpace = CGColorSpaceCreateDeviceRGB();
-    _cachedContext = CGBitmapContextCreate(NULL,
-                                           _w * _s,
-                                           _h * _s,
-                                           8,
-                                           _w * _s * 4,
-                                           _colorSpace,
-                                           kCGImageAlphaPremultipliedFirst);
-    CGColorSpaceRelease(_colorSpace);
-    CGContextScaleCTM(_cachedContext, _s, _s);
-    
     [self setNeedsRecalculateCellPath];
 }
 
@@ -185,42 +238,10 @@
     [super setBounds:bounds];
     _center = CGPointMake(bounds.size.width / 2, bounds.size.height / 2);
     _dim = MIN(bounds.size.width, bounds.size.height);
-    
-    if ( _cachedContext ) {
-        CGContextRelease(_cachedContext);
-    }
-    
-    CGFloat _w = bounds.size.width;
-    CGFloat _h = bounds.size.height;
-    CGFloat _s = [UIScreen mainScreen].scale;
-    
-    CGColorSpaceRef _colorSpace = CGColorSpaceCreateDeviceRGB();
-    _cachedContext = CGBitmapContextCreate(NULL,
-                                           _w * _s,
-                                           _h * _s,
-                                           8,
-                                           _w * _s * 4,
-                                           _colorSpace,
-                                           kCGImageAlphaPremultipliedFirst);
-    CGColorSpaceRelease(_colorSpace);
-    CGContextScaleCTM(_cachedContext, _s, _s);
-    
     [self setNeedsRecalculateCellPath];
 }
 
-@synthesize percentange = _percentage;
-- (void)setPercentange:(CGFloat)percentange
-{
-    if ( percentange > 1.f ) percentange = 1.f;
-    if ( PYFLOATEQUAL(percentange, _percentage) ) return;
-    
-    [self willChangeValueForKey:@"percentage"];
-    // Set the percentage
-    _percentage = percentange;
-    [self _redrawCacheAndDisplay];
-    
-    [self didChangeValueForKey:@"percentage"];
-}
+@dynamic percentage;
 
 @synthesize lineStyle = _lineStyle;
 - (void)setLineStyle:(PYGradientCycleStyle)lineStyle
@@ -228,7 +249,7 @@
     [self willChangeValueForKey:@"lineStyle"];
     
     _lineStyle = lineStyle;
-    [self setNeedsRecalculateCellPath];
+    [self setNeedsDisplay];
     
     [self didChangeValueForKey:@"lineStyle"];
 }
@@ -238,8 +259,9 @@
 {
     [self willChangeValueForKey:@"cycleHeavy"];
     _cycleHeavy = cycleHeavy;
+    [self setNeedsDisplay];
+    
     [self didChangeValueForKey:@"cycleHeavy"];
-    [self setNeedsRecalculateCellPath];
 }
 
 @synthesize isGradientFill = _gradientFill;
@@ -247,8 +269,10 @@
 {
     [self willChangeValueForKey:@"isGradientFill"];
     _gradientFill = isGradientFill;
+    //[self _recalculatePercentagePath];
+    [self setNeedsDisplay];
+    
     [self didChangeValueForKey:@"isGradientFill"];
-    [self _redrawCacheAndDisplay];
 }
 
 @synthesize gradientCycleQuality = _subDivCount;
@@ -257,8 +281,9 @@
     [self willChangeValueForKey:@"gradientCycleQuality"];
     _subDivCount = gradientCycleQuality;
     _divRadius = M_PI * 2 / _subDivCount;
-    [self didChangeValueForKey:@"gradientCycleQuality"];
     [self setNeedsRecalculateCellPath];
+    
+    [self didChangeValueForKey:@"gradientCycleQuality"];
 }
 
 @synthesize fillColor = _fillColor;
@@ -267,7 +292,8 @@
     [self willChangeValueForKey:@"fillColor"];
     _fillColor = fillColor;
     [self didChangeValueForKey:@"fillColor"];
-    if ( _gradientFill == NO ) [self _redrawCacheAndDisplay];
+    
+    if ( _gradientFill == NO ) [self setNeedsDisplay];
 }
 
 - (id)init
@@ -276,56 +302,75 @@
     if ( self ) {
         self.contentsScale = [UIScreen mainScreen].scale;
         [self _initializeDefaultParameters];
+        [self setMasksToBounds:YES];
     }
     return self;
 }
 
-- (void)dealloc
+- (id)initWithLayer:(id)layer
 {
-    if ( _cachedContext ) {
-        CGContextRelease(_cachedContext);
+    self = [super initWithLayer:layer];
+    if ( self ) {
+        if ( [layer isKindOfClass:[PYGradientCycle class]] ) {
+            PYGradientCycle *_other = (PYGradientCycle *)layer;
+            //_percentage = _other->_percentage;
+            _cycleHeavy = _other->_cycleHeavy;
+            _subDivCount = _other->_subDivCount;
+            _divRadius = _other->_divRadius;
+            _gradientFill = _other->_gradientFill;
+            _fillColor = [_other->_fillColor copy];
+            _lineStyle = _other->_lineStyle;
+            _dim = _other->_dim;
+            
+            _cellPath = nil;
+            _needsRecalculatePathTimer = nil;
+            _cachedImage = [_other->_cachedImage copy];
+            if ( _cachedImage == nil ) {
+                [self _calculateCellPath];
+            }
+            
+            self.percentage = _other.percentage;
+            self.bounds = _other.bounds;
+            //self.percentage = 0.f;
+        }
     }
+    return self;
+}
+
++ (BOOL)needsDisplayForKey:(NSString *)key
+{
+    if ( [key isEqualToString:@"percentage"] ) {
+        return YES;
+    }
+    
+    return [super needsDisplayForKey:key];
+}
+
+- (id<CAAction>)actionForKey:(NSString *)event
+{
+    if ( [event isEqualToString:@"percentage"] ) {
+        CABasicAnimation *_anim = [CABasicAnimation animationWithKeyPath:event];
+        _anim.fromValue = @([[self presentationLayer] percentage]);
+        _anim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        _anim.duration = .5f;
+        
+        return _anim;
+    }
+    return [super actionForKey:event];
 }
 
 - (void)setPercentange:(CGFloat)percentange animateDuration:(CGFloat)duration
 {
     if ( percentange > 1.f ) percentange = 1.f;
-    _percentageBeforeAnimation = _percentage;
-    _percentageAfterAnimation = percentange;
-    _percentageAnimationDuration = duration;
-    _percentageDrawnPieceCount = _subDivCount * _percentage;
     
-    if ( _percentageDisplayLink ) {
-        [_percentageDisplayLink invalidate];
-    }
+    CABasicAnimation *_percentageAnim = [CABasicAnimation animationWithKeyPath:@"percentage"];
+    _percentageAnim.fromValue = @(self.percentage);
+    _percentageAnim.toValue = @(percentange);
+    _percentageAnim.duration = duration;
+    _percentageAnim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
     
-    _percentageDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(_percentageAnimationEvent)];
-    [_percentageDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-}
-
-- (void)_percentageAnimationEvent
-{
-    if ( PYFLOATEQUAL(_percentage, _percentageAfterAnimation) ) {
-        [_percentageDisplayLink invalidate];
-        _percentageDisplayLink = nil;
-        return;
-    }
-    CGFloat _deltaPercentage = (_percentageAfterAnimation - _percentageBeforeAnimation);
-    CGFloat _deltaEachTime = _percentageAnimationDuration / _percentageDisplayLink.duration;
-    CGFloat _deltaPercentageEachTime = _deltaPercentage / _deltaEachTime;
-    
-    _percentage += _deltaPercentageEachTime;
-    
-    int _pieceCount = _subDivCount * self.percentange;
-    if ( _percentageDrawnPieceCount > _pieceCount ) {
-        [self _redrawCacheAndDisplay];
-    } else {
-        for ( NSInteger i = _percentageDrawnPieceCount; i < _pieceCount; ++i ) {
-            [self _internalDrawPieceCellAtIndex:(int)i inContext:_cachedContext];
-        }
-        _percentageDrawnPieceCount = _pieceCount;
-        [self setNeedsDisplay];
-    }
+    [self setPercentage:percentange];
+    [self addAnimation:_percentageAnim forKey:@"percentage"];
 }
 
 - (void)_internalDrawPieceCellAtIndex:(NSInteger)index inContext:(CGContextRef)ctx
@@ -353,9 +398,8 @@
 
 - (void)drawInContext:(CGContextRef)ctx
 {
-    CGImageRef _cachedImage = CGBitmapContextCreateImage(_cachedContext);
-    CGContextDrawImage(ctx, self.bounds, _cachedImage);
-    CGImageRelease(_cachedImage);
+    [self _percentageCircleMaskImage];
+    CGContextDrawImage(ctx, self.bounds, _maskedImage.CGImage);
 }
 
 @end

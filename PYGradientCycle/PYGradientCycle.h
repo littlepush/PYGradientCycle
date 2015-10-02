@@ -60,7 +60,7 @@ typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
 /*!
  @brief The percentage of the cycle. 0 - 1, in float
  */
-@property (nonatomic, assign)   CGFloat                 percentange;
+@property (nonatomic)           CGFloat                 percentage;
 
 /*!
  @brief The syle of the line, default is PYGradientCycleStyleRound
