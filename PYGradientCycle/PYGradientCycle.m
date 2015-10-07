@@ -86,7 +86,7 @@
 {
     CGFloat _endAngle = (M_PI * 2 * percentage);
     UIBezierPath *_cyclePath = [UIBezierPath bezierPath];
-    [_cyclePath moveToPoint:CGPointMake(_center.x, _center.y - _dim)];
+    [_cyclePath moveToPoint:CGPointMake(_center.x, _center.y - _dim / 2)];
     [_cyclePath addArcWithCenter:_center
                           radius:(_dim / 2)
                       startAngle:(-M_PI_2)
@@ -114,7 +114,7 @@
                        clockwise:NO];
     
     if ( _lineStyle == PYGradientCycleStyleRound ) {
-        CGPoint _leftCenter = CGPointMake(_center.x, (_center.y - _dim) + (_cycleHeavy / 2));
+        CGPoint _leftCenter = CGPointMake(_center.x, (_center.y - _dim / 2) + (_cycleHeavy / 2));
         [_cyclePath addArcWithCenter:_leftCenter
                               radius:(_cycleHeavy / 2)
                           startAngle:(M_PI_2)
@@ -151,8 +151,8 @@
 {
     //PYLog(@"try to calculate cell path");
     _cellPath = [UIBezierPath bezierPath];
-    [_cellPath moveToPoint:CGPointMake(_center.x, _center.y - _dim)];
-    [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 clockwise:YES];
+    [_cellPath moveToPoint:CGPointMake(_center.x, _center.y - _dim / 2)];
+    [_cellPath addArcWithCenter:_center radius:_dim / 2 startAngle:-M_PI_2 endAngle:_divRadius - M_PI_2 + 0.01 clockwise:YES];
     [_cellPath addLineToPoint:_center];
     [_cellPath closePath];
     
@@ -182,6 +182,7 @@
     [self setNeedsRecalculateCellPath];
     
     self.percentage = 0.f;
+    self.isSupportImplictAnimation = NO;
 }
 
 /*!
@@ -307,6 +308,7 @@
             
             self.percentage = _other.percentage;
             self.bounds = _other.bounds;
+            self.isSupportImplictAnimation = _other.isSupportImplictAnimation;
             //self.percentage = 0.f;
         }
     }
@@ -324,7 +326,7 @@
 
 - (id<CAAction>)actionForKey:(NSString *)event
 {
-    if ( [event isEqualToString:@"percentage"] ) {
+    if ( [event isEqualToString:@"percentage"] && self.isSupportImplictAnimation ) {
         CABasicAnimation *_anim = [CABasicAnimation animationWithKeyPath:event];
         _anim.fromValue = @([[self presentationLayer] percentage]);
         _anim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];

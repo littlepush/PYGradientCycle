@@ -58,6 +58,11 @@ typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
 @interface PYGradientCycle : CALayer
 
 /*!
+ @brief If support implict animation, default is NO;
+ */
+@property (nonatomic, assign)   BOOL                    isSupportImplictAnimation;
+
+/*!
  @brief The percentage of the cycle. 0 - 1, in float
  */
 @property (nonatomic)           CGFloat                 percentage;
