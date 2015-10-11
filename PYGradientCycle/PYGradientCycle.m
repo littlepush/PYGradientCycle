@@ -58,7 +58,8 @@
     CGPoint                     _center;
     CGFloat                     _dim;
     
-    BOOL                        _gradientFill;
+    //BOOL                        _gradientFill;
+    PYGradientCycleFillType     _fillType;
     UIColor                     *_fillColor;
     
     UIBezierPath                *_cellPath;
@@ -172,13 +173,14 @@
     _cycleHeavy = 10.f;
     _subDivCount = PYGradientCycleQualityNormal;
     _divRadius = M_PI * 2 / _subDivCount;
-    _gradientFill = YES;
+    //_gradientFill = YES;
     _fillColor = [UIColor redColor];
     _lineStyle = PYGradientCycleStyleRound;
     
     _cellPath = nil;
     _needsRecalculatePathTimer = nil;
     _cachedImage = nil;
+    _fillType = PYGradientCycleFillTypeSolid;
     [self setNeedsRecalculateCellPath];
     
     self.percentage = 0.f;
@@ -190,6 +192,13 @@
  */
 - (void)setNeedsRecalculateCellPath
 {
+    // If the fill type is image, do not need to recalculate the path
+    if ( _fillType != PYGradientCycleFillTypeGradientColor ) {
+        [self setNeedsDisplay];
+        return;
+    }
+    
+    // If is gradient color fill, try to recalculate the path
     if ( _needsRecalculatePathTimer != nil ) return;
     _needsRecalculatePathTimer = [NSTimer
                                   timerWithTimeInterval:0
@@ -220,6 +229,26 @@
 
 @dynamic percentage;
 
+@synthesize fillType = _fillType;
+- (void)setFillType:(PYGradientCycleFillType)fillType
+{
+    [self willChangeValueForKey:@"fillType"];
+    _fillType = fillType;
+    [self setNeedsRecalculateCellPath];
+    [self didChangeValueForKey:@"fileType"];
+}
+
+@synthesize fillImage = _cachedImage;
+- (void)setFillImage:(UIImage *)fillImage
+{
+    [self willChangeValueForKey:@"fillImage"];
+    _cachedImage = fillImage;
+    [self didChangeValueForKey:@"fillImage"];
+    if ( _fillType ==  PYGradientCycleFillTypeImage ) {
+        [self setNeedsDisplay];
+    }
+}
+
 @synthesize lineStyle = _lineStyle;
 - (void)setLineStyle:(PYGradientCycleStyle)lineStyle
 {
@@ -241,16 +270,8 @@
     [self didChangeValueForKey:@"cycleHeavy"];
 }
 
-@synthesize isGradientFill = _gradientFill;
-- (void)setIsGradientFill:(BOOL)isGradientFill
-{
-    [self willChangeValueForKey:@"isGradientFill"];
-    _gradientFill = isGradientFill;
-    //[self _recalculatePercentagePath];
-    [self setNeedsDisplay];
-    
-    [self didChangeValueForKey:@"isGradientFill"];
-}
+@dynamic isGradientFill;
+- (BOOL)isGradientFill { return _fillType == PYGradientCycleFillTypeGradientColor; }
 
 @synthesize gradientCycleQuality = _subDivCount;
 - (void)setGradientCycleQuality:(NSInteger)gradientCycleQuality
@@ -270,7 +291,10 @@
     _fillColor = fillColor;
     [self didChangeValueForKey:@"fillColor"];
     
-    if ( _gradientFill == NO ) [self setNeedsDisplay];
+    if ( _fillType == PYGradientCycleFillTypeSolid ) {
+        [self setNeedsDisplay];
+    }
+    //if ( _gradientFill == NO ) [self setNeedsDisplay];
 }
 
 - (id)init
@@ -294,7 +318,8 @@
             _cycleHeavy = _other->_cycleHeavy;
             _subDivCount = _other->_subDivCount;
             _divRadius = _other->_divRadius;
-            _gradientFill = _other->_gradientFill;
+            _fillType = _other->_fillType;
+            //_gradientFill = _other->_gradientFill;
             _fillColor = [_other->_fillColor copy];
             _lineStyle = _other->_lineStyle;
             _dim = _other->_dim;
@@ -302,7 +327,8 @@
             _cellPath = nil;
             _needsRecalculatePathTimer = nil;
             _cachedImage = [_other->_cachedImage copy];
-            if ( _cachedImage == nil ) {
+            if ( _cachedImage == nil &&
+                (_fillType == PYGradientCycleFillTypeGradientColor) ) {
                 [self _calculateCellPath];
             }
             
@@ -359,12 +385,14 @@
     CGContextTranslateCTM(ctx, -self.bounds.size.width / 2, -self.bounds.size.height / 2);
     
     CGContextSetLineCap(ctx, kCGLineCapRound);
-    if ( _gradientFill ) {
+    //if ( _gradientFill ) {
+    if ( _fillType == PYGradientCycleFillTypeGradientColor ) {
         UIColor *_gColor = [UIColor colorWithHue:(float)index / _subDivCount saturation:1 brightness:1 alpha:1];
         CGContextSetFillColorWithColor(ctx, _gColor.CGColor);
-    } else {
-        CGContextSetFillColorWithColor(ctx, _fillColor.CGColor);
     }
+    /*else {
+     CGContextSetFillColorWithColor(ctx, _fillColor.CGColor);
+     }*/
     
     CGContextAddPath(ctx, _cellPath.CGPath);
     CGContextFillPath(ctx);
@@ -378,7 +406,7 @@
 {
     UIBezierPath *_circlePath = [self _cyclePathForPercentage:self.percentage];
     
-    if ( _gradientFill ) {
+    if ( _fillType != PYGradientCycleFillTypeSolid ) {
         //[self _percentageCircleMaskImage];
         CGContextAddPath(ctx, _circlePath.CGPath);
         CGContextClip(ctx);

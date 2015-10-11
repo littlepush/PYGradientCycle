@@ -55,12 +55,28 @@ typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
     PYGradientCycleStyleRound,
 };
 
+typedef NS_ENUM(NSInteger, PYGradientCycleFillType) {
+    PYGradientCycleFillTypeSolid,
+    PYGradientCycleFillTypeImage,
+    PYGradientCycleFillTypeGradientColor
+};
+
 @interface PYGradientCycle : CALayer
 
 /*!
  @brief If support implict animation, default is NO;
  */
 @property (nonatomic, assign)   BOOL                    isSupportImplictAnimation;
+
+/*!
+ @brief The fill type of the cycle, default is Solid
+ */
+@property (nonatomic, assign)   PYGradientCycleFillType fillType;
+
+/*!
+ @brief If the fill type is Image, set this image
+ */
+@property (nonatomic, strong)   UIImage                 *fillImage;
 
 /*!
  @brief The percentage of the cycle. 0 - 1, in float
@@ -80,7 +96,7 @@ typedef NS_ENUM(NSInteger, PYGradientCycleStyle) {
 /*!
  @brief if use a gradient color to fill the cycle. Default is YES
  */
-@property (nonatomic, assign)   BOOL                    isGradientFill;
+@property (nonatomic, readonly) BOOL                    isGradientFill;
 
 /*!
  @brief the quality of the gradient, default is PYGradientCycleQualityNormal
